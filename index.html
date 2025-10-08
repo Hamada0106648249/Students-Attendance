@@ -206,19 +206,28 @@
 
     let qrobj = null;
     async function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+src));document.head.appendChild(s);});}
+async function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+src));document.head.appendChild(s);});}
 async function ensureQRCodeLib(){
-  if(window.QRCode) return;
-  try{
-    await loadScript('https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js');
-  }catch(e){
-    // Fallback CDN
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
-  }
+  if(window.QRCode) return true;
+  try{ await loadScript('https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js'); return true; }
+  catch(e){ try{ await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'); return true; }
+  catch(e2){ return false; } }
 }
+let qrobj=null;
 async function ensureQRCode(){
-  await ensureQRCodeLib();
-  if(!qrobj){ qrobj = new QRCode(qrContainer, {width:256,height:256}); }
+  const ok = await ensureQRCodeLib();
+  if(ok && !qrobj){ qrobj = new QRCode(qrContainer,{width:256,height:256}); }
+  return ok;
 }
+function renderQRImageFallback(text){
+  // Google Chart API image fallback (no JS library needed)
+  const imgUrl = 'https://chart.googleapis.com/chart?cht=qr&chs=256x256&chl='+encodeURIComponent(text);
+  qrContainer.innerHTML='';
+  const img=document.createElement('img');
+  img.alt='QR'; img.width=256; img.height=256; img.referrerPolicy='no-referrer';
+  img.src = imgUrl;
+  qrContainer.appendChild(img);
+}}
 
     function randomToken(len=24){
       const a = new Uint8Array(len);
@@ -282,9 +291,9 @@ async function ensureQRCode(){
       url.searchParams.set('session', current.sessionId);
       url.searchParams.set('token', token);
       ensureQRCode();
-      await ensureQRCode();
-      if(qrobj.clear) qrobj.clear();
-      qrobj.makeCode(url.toString());
+      const libReady = await ensureQRCode();
+      if(libReady){ if(qrobj && qrobj.clear) qrobj.clear(); qrobj.makeCode(url.toString()); }
+      else { renderQRImageFallback(url.toString()); }
       qrLinkEl.textContent = url.toString();
 
       // عدّ تنازلي بسيط
