@@ -1,491 +1,115 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>نظام حضور عبر QR — محدث كل 10 ثوانٍ</title>
-  <link rel="icon" href="data:," />
-  <style>
-    :root { --pri:#0a7cff; --bg:#0b1020; --card:#121a2c; --muted:#9fb3c8; --ok:#19c37d; --warn:#ffb020; --bad:#ff5454; }
-    html,body{margin:0;padding:0;background:var(--bg);color:white;font-family:system-ui,Segoe UI,Arial,"Noto Kufi Arabic",sans-serif}
-    .wrap{max-width:1100px;margin:0 auto;padding:24px}
-    h1{font-weight:700;margin:0 0 10px;font-size:clamp(20px,4vw,30px)}
-    .sub{color:var(--muted);margin-bottom:18px}
-    .row{display:grid;grid-template-columns:1.3fr 1fr;gap:20px}
-    .card{background:var(--card);border:1px solid #1c2742;border-radius:16px;padding:16px}
-    label{display:block;margin:10px 0 6px;color:#cfe2ff}
-    input,select,button,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #25406b;background:#0c1426;color:white}
-    input::placeholder{color:#6f86a3}
-    button{cursor:pointer;background:linear-gradient(180deg,#0f7bff,#0659c7);border:none}
-    button.secondary{background:#17243e}
-    button.danger{background:linear-gradient(180deg,#ff6767,#d63a3a)}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .qrBox{display:grid;place-items:center;min-height:280px;border:1px dashed #2a3b60;border-radius:14px}
-    .muted{color:#9fb3c8;font-size:13px}
-    .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;margin-inline-start:6px;background:#0f1a32;border:1px solid #22345a}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:10px;border-bottom:1px solid #1f2d4b;text-align:right}
-    tr:hover{background:#111a2f}
-    .row2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-    .hide{display:none}
-    .ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
-    .footer{margin-top:30px;color:#88a0bd;font-size:12px}
-    .flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .left{direction:ltr;text-align:left}
-    .pill{background:#0a6ad6;padding:4px 10px;border-radius:999px;font-size:12px}
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QR Attendance — DEBUG Minimal (No Firebase, No CDN)</title>
+<style>
+  :root { --bg:#0b1020; --card:#121a2c; --muted:#9fb3c8; --ok:#19c37d; --bad:#ff5454; }
+  html,body{margin:0;padding:0;background:var(--bg);color:#fff;font-family:system-ui,Segoe UI,Arial,"Noto Kufi Arabic",sans-serif}
+  .wrap{max-width:880px;margin:0 auto;padding:24px}
+  .card{background:var(--card);border-radius:14px;border:1px solid #243356;padding:16px}
+  button{padding:10px 14px;border-radius:10px;border:0;background:#0a6ad6;color:#fff;cursor:pointer}
+  input{width:100%;padding:10px;border-radius:10px;border:1px solid #25406b;background:#0c1426;color:#fff}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .qrBox{display:grid;place-items:center;min-height:280px;border:2px dashed #3b5891;border-radius:14px}
+  .muted{color:var(--muted);font-size:13px}
+  pre.diag{white-space:pre-wrap;background:#0e172b;border-radius:10px;padding:10px;border:1px solid #1f2d4b}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>تسجيل الحضور بالـ QR (متجدد كل 10 ثوانٍ)</h1>
-    <div class="sub">صفحة واحدة تعمل على GitHub Pages + Firebase. تعرض QR متغيرًا كل 10 ثوانٍ، ويُبطِل الرموز السابقة تلقائيًا. يدخُل الطالب اسمه بالعربية، وتستطيع تصدير الأسماء إلى Excel.</div>
+<div class="wrap">
+  <h1>اختبار عرض QR — إصدار تشخيصي مبسّط (بدون Firebase)</h1>
+  <p class="muted">هذا ملف مستقل تمامًا لا يعتمد على أي شبكة. إذا ظهر QR هنا فالمشكلة ليست في المكتبة، بل في الإعدادات/الأذونات في الصفحة السابقة أو في Firebase. إذا لم يظهر QR هنا أيضًا، فغالبًا يوجد تعارض سياسة أمان (CSP) يمنع تشغيل السكربتات.</p>
 
-    <!-- Tabs -->
-    <div class="flex" style="margin-bottom:12px">
-      <button id="tabInstructor" class="pill">وضع المُحاضر</button>
-      <button id="tabStudent" class="pill" style="background:#1f2d4b">وضع الطالب</button>
-      <span class="badge">Bioinformatika — Dr. Ahmed M. Sayed Lab</span>
-    </div>
-
-    <!-- Instructor Console -->
-    <section id="instructor" class="card">
-      <div class="row">
-        <div>
-          <div class="grid2">
-            <div>
-              <label>اسم المقرر</label>
-              <input id="course" placeholder="مثال: فيسيولوجيا — الفرقة الثانية" />
-            </div>
-            <div>
-              <label>رقم/عنوان المحاضرة (اختياري)</label>
-              <input id="lecture" placeholder="مثال: Lec 05 — الغدد الكظرية" />
-            </div>
-          </div>
-
-          <div class="grid2" style="margin-top:12px">
-            <div>
-              <label>زمن تحديث الرمز (ثوانٍ)</label>
-              <input id="interval" type="number" min="5" step="5" value="10" />
-            </div>
-            <div>
-              <label>جلسة الحضور</label>
-              <input id="sessionId" placeholder="سيتم توليده تلقائيًا عند البدء" disabled />
-            </div>
-          </div>
-
-          <div class="grid2" style="margin-top:12px">
-            <button id="btnStart">بدء الجلسة + تشغيل QR المتجدد</button>
-            <button id="btnStop" class="danger">إيقاف الجلسة</button>
-          </div>
-
-          <div class="grid2" style="margin-top:12px">
-            <button id="btnExport" class="secondary">تصدير XLSX</button>
-            <button id="btnClear" class="secondary">تفريغ قائمة الجلسة الحالية (محليًا)</button>
-          </div>
-
-          <div id="status" class="muted" style="margin-top:8px"></div>
-          <div class="muted" style="margin-top:6px">تلميح: افتح هذه الصفحة على شاشة العرض في القاعة، ليقوم الطلبة بمسح الـ QR بكاميراتهم.</div>
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>فاصل التحديث (ثانية)</label>
+        <input id="interval" type="number" min="3" step="1" value="10" />
+        <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+          <button id="btnTest">رسم QR تجريبي الآن</button>
+          <button id="btnStart">ابدأ التدوير</button>
+          <button id="btnStop" style="background:#7a1f1f">إيقاف</button>
         </div>
-        <div>
-          <label>QR الحالي (يبطل ما قبله)</label>
-          <div id="qr" class="qrBox"><div id="qrTarget"></div></div>
-          <div class="muted left" id="qrLink" style="margin-top:8px;word-break:break-all"></div>
-          <div class="muted" id="countdown" style="margin-top:6px"></div>
-        </div>
+        <div class="muted" style="margin-top:8px">سيظهر رابط الطلبة الحالي أسفل QR.</div>
       </div>
-    </section>
-
-    <!-- Student Check-in -->
-    <section id="student" class="card hide">
-      <label>اكتب اسمك بالعربية كما سيظهر في كشف الحضور</label>
-      <input id="studentName" placeholder="مثال: أحمد محمد السيد فرج" />
-      <div class="grid2" style="margin-top:12px">
-        <button id="btnSubmit">تسجيل الحضور الآن</button>
-        <button id="btnMyReceipt" class="secondary">تحميل إيصال صغير (PNG)</button>
+      <div>
+        <div class="qrBox"><div id="qr"></div></div>
+        <div id="link" class="muted" style="margin-top:8px;word-break:break-all"></div>
       </div>
-      <div class="muted" id="studentMsg" style="margin-top:8px"></div>
-    </section>
-
-    <!-- Live Table -->
-    <section class="card" style="margin-top:16px">
-      <h3 style="margin-top:0">قائمة الحضور (للجلسة الحالية)</h3>
-      <div style="overflow:auto">
-        <table id="tbl">
-          <thead><tr><th>#</th><th>الاسم</th><th>التاريخ/الوقت</th><th>الجلسة</th><th>المعرّف</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
-
-    <div class="footer">© Bioinformatika — Dr. Ahmed M. Sayed Lab. يعمل دون خادم (Static) مع Firebase Firestore وSheetJS وQRCode.js. 
-      <span class="badge">نصيحة أمنية: فعّل Firebase Auth واكتب القواعد كما بالأسفل.</span>
     </div>
   </div>
 
-  <!-- ===== Libraries (CDN) ===== -->
-  <!-- Firebase v10 compat CDN (سهل لملف واحد على GitHub Pages) -->
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
-  <!-- QRCode.js (inlined, MIT, no external CDN) -->
+  <div style="margin-top:16px" class="card">
+    <h3 style="margin-top:0">السجل التشخيصي</h3>
+    <pre id="diag" class="diag"></pre>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3 style="margin-top:0">ملاحظات مهمة</h3>
+    <ul>
+      <li>هذا الملف لا يستخدم أي شبكة مطلقًا؛ إذا فشل عرض QR هنا، فسبب ذلك يكون غالبًا سياسة <b>CSP</b> تمنع السكربتات المضمّنة. الحل: اجعل السكربت في ملف خارجي وأضف <code>nonce</code> أو <code>sha256</code> في <code>Content-Security-Policy</code>.</li>
+      <li>بعد نجاح العرض هنا، سنعيد دمج نفس محرك QR مع صفحة الحضور وربط Firebase تدريجيًا.</li>
+    </ul>
+  </div>
+</div>
+
 <script>
-/* qrcode.js (MIT, by Kazuhiko Arase) — minimal inline build for QR rendering */
-/* Source: https://github.com/kazuhikoarase/qrcode-generator (inlined to avoid CDN blocks) */
-!function(){function w(a){this.mode=v,this.data=a}function x(a,c){this.typeNumber=a,this.errorCorrectLevel=c,this.modules=null,this.moduleCount=0,this.dataCache=null,this.dataList=[]}
-var v=4;w.prototype={getLength:function(){return this.data.length},write:function(a){for(var c=0;c<this.data.length;c++){var b=this.data.charCodeAt(c);128>b?a.put(b,8):2048>b?(a.put(192|b>>6,8),a.put(128|63&b,8)):(a.put(224|b>>12,8),a.put(128|b>>6&63,8),a.put(128|63&b,8))}}};
-var y=function(){var a=[];return{getRSBlockTable:function(b,c){switch(c){case 1:return a[4*b+0];case 0:return a[4*b+1];case 3:return a[4*b+2];case 2:return a[4*b+3];default:return void 0}},add:function(b){a.push(b)}}}();
-function z(a,c){for(var b=0;b<c;b++)a.push(0)}function A(a,c){if(void 0==a.length)throw Error(a.length+"/"+c);for(;a.length>c;)a.shift();for(;a.length<c;)a.unshift(0);return a}
-function B(a){for(var c=0;c<a.length&&0==a[c];)c++;var b=new Array(a.length-c);return b.length==0?[]:(b[0]=a[c],b)}
-function C(a,c){for(var b=a.slice(0),d=c.slice(0);b.length>0&&0==b[0];)b.shift();for(;d.length>0&&0==d[0];)d.shift();if(b.length<d.length)return [0];for(var e=[],f=b.slice(0),g=d[0],h=d.length;f.length>=h;){for(var k=Math.floor(f[0]/g),l=new Array(h),m=0;m<h;m++)l[m]=d[m]*k;for(l=A(l,f.length),m=0;m<f.length;m++)f[m]-=l[m];for(;f.length>0&&0==f[0];)f.shift();e.push(k)}return e}
-function D(a,c){for(var b=new Array(a.length+c.length-1),d=0;d<b.length;d++)b[d]=0;for(d=0;d<a.length;d++)for(var e=0;e<c.length;e++)b[d+e]+=a[d]*c[e];return b}
-function E(a,c){for(var b=a.slice(0),d=0;d<b.length;d++)b[d]%=c;return b}
-var F=function(){function a(b){this.buffer=[],this.length=0,void 0!=b&&(this.buffer=b,this.length=8*b.length)}return a.prototype.put=function(b,d){for(var e=0;e<d;e++)this.putBit((b>>>d-e-1&1)==1)},a.prototype.putBit=function(b){var d=Math.floor(this.length/8);this.buffer.length<=d&&this.buffer.push(0),b&&(this.buffer[d]|=128>>>this.length%8),this.length++},a}();
-function G(a,c){this.totalCount=a;this.dataCount=c}
-G.getRSBlocks=function(a,c){var b=y.getRSBlockTable(a,c);if(void 0==b)throw Error("bad rs block @ typeNumber:"+a+"/errorCorrectLevel:"+c);for(var d=[],e=0;e<b.length/3;e++)for(var f=b[3*e+0],g=b[3*e+1],h=b[3*e+2],k=0;k<f;k++)d.push(new G(g,h));return d};
-function H(a,c){this.buffer=new F;this.length=0;this.buffer.put(a,4);this.buffer.put(c,8)}
-H.prototype.write=function(a){for(var c=0;c<a.length;c++)this.buffer.put(a[c],8)};
-var I={L:1,M:0,Q:3,H:2};
-x.prototype={addData:function(a){this.dataList.push(new w(a)),this.dataCache=null},isDark:function(a,c){if(void 0==this.modules[a]||void 0==this.modules[a][c])throw Error(a+","+c);return this.modules[a][c]},getModuleCount:function(){return this.moduleCount},make:function(){if(this.typeNumber<1){for(var a=1;a<40;a++){for(var c=G.getRSBlocks(a,I.M),b=0,d=0;d<c.length;d++)b+=c[d].dataCount;for(var e=new F,f=0;f<this.dataList.length;f++){var g=this.dataList[f];g.write(e)}if(e.length<=8*b){this.typeNumber=a;break}}}this.makeImpl(!1,this.getBestMaskPattern())},makeImpl:function(a,c){this.moduleCount=4*this.typeNumber+17;this.modules=new Array(this.moduleCount);for(var b=0;b<this.moduleCount;b++){this.modules[b]=new Array(this.moduleCount);for(var d=0;d<this.moduleCount;d++)this.modules[b][d]=null}this.setupPositionProbePattern(0,0);this.setupPositionProbePattern(this.moduleCount-7,0);this.setupPositionProbePattern(0,this.moduleCount-7);this.setupTimingPattern();this.setupTypeInfo(a,c);this.typeNumber>=7&&this.setupTypeNumber(a);this.mapData(this.createData(this.typeNumber,I.M),c)},setupPositionProbePattern:function(a,c){for(var b=-1;7>=b;b++)if(!(0>a+b||this.moduleCount<=a+b))for(var d=-1;7>=d;d++)0>c+d||this.moduleCount<=c+d||(this.modules[a+b][c+d]=0<=b&&6>=b&&(0==d||6==d)||0<=d&&6>=d&&(0==b||6==b)||2<=b&&4>=b&&2<=d&&4>=d)},getBestMaskPattern:function(){for(var a=0,c=0,b=0;8>b;b++){this.makeImpl(!0,b);var d=t.getLostPoint(this);(0==b||a>d)&&(a=d,c=b)}return c},createData:function(a,c){for(var b=G.getRSBlocks(a,c),d=new F,e=0;e<this.dataList.length;e++){var f=this.dataList[e];f.write(d)}for(e=0;e<b.length;e++){var g=b[e].dataCount;d.length<=8*g&&d.put(0,8*g-d.length)}return J(d,b)},setupTimingPattern:function(){for(var a=8;a<this.moduleCount-8;a++)null===this.modules[a][6]&&(this.modules[a][6]=0==a%2),null===this.modules[6][a]&&(this.modules[6][a]=0==a%2)},setupTypeInfo:function(a,c){for(var b=t.getBCHTypeInfo(I.M<<3|c),d=0;15>d;d++){var e=!a&&1==(b>>d&1);6>d?this.modules[d][8]=e:8==d?this.modules[d+1][8]=e:this.modules[d+1][8]=e}for(d=0;15>d;d++){e=!a&&1==(b>>d&1);6>d?this.modules[8][this.moduleCount-d-1]=e:8==d?this.modules[8][this.moduleCount-d-1-1]=e:this.modules[8][this.moduleCount-d-1]=e}},setupPositionAdjustPattern:function(){},setupTypeNumber:function(a){for(var c=t.getBCHTypeNumber(this.typeNumber),b=0;18>b;b++)this.modules[Math.floor(b/3)][b%3+this.moduleCount-8-3]=!a&&1==(c>>b&1)},mapData:function(a,c){for(var b=-1,d=this.moduleCount-1,e=7,f=0,g=this.moduleCount-1;0<g;g-=2){6==g&&g--;for(var h=0;h<this.moduleCount;h++){var k=b<0?this.moduleCount-1-h:h;for(var l=0;2>l;l++)null==this.modules[k][g-l]&&(0<f&&(this.modules[k][g-l]=1==(a[f>>>3]>>>7-(f&7)&1)),f++,e--,0>e&&(e=7,d--))}b*=-1}}};
-var t=function(){function a(b,c){for(var d=0;0!=b;)d+=1,b>>>=1;for(var e=0;e<d-1;e++)c<<=1;return b=c^b}return{getBCHTypeInfo:function(b){for(var c=b<<10,d=1335;1023<c;)c=a(c,d);return b<<10|c},getBCHTypeNumber:function(b){for(var c=b<<12,d=7973;4095<c;)c=a(c,d);return b<<12|c},getLostPoint:function(b){for(var c=b.getModuleCount(),d=0,e=0;e<c;e++)for(var f=0;f<c;f++){for(var g=0,h=b.isDark(e,f),k=-1;1>=k;k++)if(!(0>e+k||e+k>=c))for(var l=-1;1>=l;l++)0>f+l||f+l>=c||(0!=k||0!=l)&&h==b.isDark(e+k,f+l)&&g++;4<g&&(d+=3+g-5)}for(e=0;e<c;e++)for(f=0;f<c-1;f++)b.isDark(e,f)==b.isDark(e,f+1)&&b.isDark(e,f+1)==b.isDark(e,f+2)&&(d+=3);for(e=0;e<c-1;e++)for(f=0;f<c;f++)b.isDark(e,f)==b.isDark(e+1,f)&&b.isDark(e+1,f)==b.isDark(e+2,f)&&(d+=3);for(e=0;e<c;e++)for(f=0;f<c;f++)b.isDark(e,f)&&(d+=f%2?0:1);return d}}}();
-function J(a,c){for(var b=0,d=0,e=0,f=0,g=0,h=[],k=0;k<c.length;k++)b=Math.max(b,c[k].dataCount),d=Math.max(d,c[k].totalCount);for(k=0;k<c.length;k++)e+=c[k].dataCount,f+=c[k].totalCount;for(var l=[],m=0;m<e;m++)l.push(255&a.buffer[Math.floor(m)]);for(var n=0;n<c.length;n++){var p=c[n].dataCount,q=c[n].totalCount-p;h.push({data:A(l.slice(g,g+p),p),ec:q});g+=p}for(var r=[],u=0;u<b;u++)for(n=0;n<h.length;n++)u<h[n].data.length&&r.push(h[n].data[u]);for(var s=[],o=0;o<h.length;o++){var Q=[1];for(m=0;m<h[o].ec;m++)Q=D(Q,[1,Math.pow(2,m)]);var R=C(Q,[1,0,0,0,0,0,0,0]);R=B(R);s.push(R)}for(o=0;o<h.length;o++){var T=h[o].data;T=D(T,s[o]);T=E(T,256);T=A(T,h[o].ec);h[o].ecw=T}
-for(u=0;u<d-b;u++)for(o=0;o<h.length;o++)h[o].data.push(0);for(u=0;u<h.length;u++)for(o=0;o<h[u].ecw.length;o++)r.push(h[u].ecw[o]);return r}
-function K(a,c,b){this.size=a,this.canvas=c,this.context=c.getContext('2d'),this.scale=b}
-K.prototype.draw=function(d){this.canvas.width=this.size*this.scale,this.canvas.height=this.size*this.scale;this.context.fillStyle='#fff',this.context.fillRect(0,0,this.canvas.width,this.canvas.height),this.context.fillStyle='#000';for(var e=0;e<d.getModuleCount();e++)for(var f=0;f<d.getModuleCount();f++)d.isDark(e,f)&&this.context.fillRect(f*this.scale,e*this.scale,this.scale,this.scale)};
-window.QRCode=function(a,c){this._el=a,this._opts=c||{width:256,height:256}};window.QRCode.prototype.makeCode=function(text){var n= new x(0,I.M);n.addData(text);n.make();var size = Math.max(this._opts.width||256,this._opts.height||256);var canvas=document.createElement('canvas');var scale=Math.max(2, Math.floor(size/n.getModuleCount()));var dr=new K(n.getModuleCount(),canvas,scale);dr.draw(n);this._el.innerHTML='';this._el.appendChild(canvas)};window.QRCode.prototype.clear=function(){this._el.innerHTML=''};
-}();
+/* === Offline QR: compact inline encoder (minimal canvas renderer) === */
+(function(){
+  function QR8bitByte(data){this.mode=4;this.data=data}
+  QR8bitByte.prototype.getLength=function(){return this.data.length};
+  QR8bitByte.prototype.write=function(buffer){for(var i=0;i<this.data.length;i++){var code=this.data.charCodeAt(i);if(code<128)buffer.put(code,8);else if(code<2048){buffer.put(192|(code>>6),8);buffer.put(128|(63&code),8)}else{buffer.put(224|(code>>12),8);buffer.put(128|((code>>6)&63),8);buffer.put(128|(63&code),8)}}};
+  function BitBuffer(){this.buffer=[];this.length=0}
+  BitBuffer.prototype.put=function(num,length){for(var i=0;i<length;i++)this.putBit(((num>>>(length-i-1))&1)==1)};
+  BitBuffer.prototype.putBit=function(bit){var bufIndex=Math.floor(this.length/8);this.buffer.length<=bufIndex&&this.buffer.push(0);bit&&(this.buffer[bufIndex]|=(0x80>>>(this.length%8)));this.length++};
+  var QRMode={MODE_8BIT_BYTE:4};
+  var QRErrorCorrectLevel={L:1,M:0,Q:3,H:2};
+  function QRCodeModel(typeNumber,errorCorrectLevel){this.typeNumber=typeNumber;this.errorCorrectLevel=errorCorrectLevel;this.modules=null;this.moduleCount=0;this.dataList=[]}
+  QRCodeModel.prototype={addData:function(data){this.dataList.push(new QR8bitByte(data))},isDark:function(r,c){return this.modules[r][c]},getModuleCount:function(){return this.moduleCount},
+    make:function(){if(this.typeNumber<1){for(var t=1;t<10;t++){var cap=capacity(t);var bb=new BitBuffer;for(var i=0;i<this.dataList.length;i++)this.dataList[i].write(bb);if(bb.length/8<=cap){this.typeNumber=t;break}}}
+      this.moduleCount=this.typeNumber*4+17;this.modules=Array.from({length:this.moduleCount},()=>Array(this.moduleCount).fill(null));
+      placePatterns(this);var data=createData(this,this.errorCorrectLevel);mapData(this,data);
+    }};
+  function capacity(type){var base=[17,32,53,78,106,134,154,192,230];return base[type-1]||230}
+  function placePatterns(qr){var n=qr.moduleCount;function box(r,c){for(var dr=-1;dr<=7;dr++)for(var dc=-1;dc<=7;dc++){var rr=r+dr,cc=c+dc;if(rr<0||rr>=n||cc<0||cc>=n)continue;var on=(dr>=0&&dr<=6&&(dc==0||dc==6))||(dc>=0&&dc<=6&&(dr==0||dr==6))||(dr>=2&&dr<=4&&dc>=2&&dc<=4);qr.modules[rr][cc]=on}}
+    box(0,0);box(n-7,0);box(0,n-7);for(var i=8;i<n-8;i++){qr.modules[6][i]=(i%2==0);qr.modules[i][6]=(i%2==0)} }
+  function createData(qr,ec){var bb=new BitBuffer;for(var i=0;i<qr.dataList.length;i++){bb.put(QRMode.MODE_8BIT_BYTE,4);bb.put(qr.dataList[i].getLength(),8);qr.dataList[i].write(bb)}
+    var cap=capacity(qr.typeNumber)*8;if(bb.length>cap)bb.length=cap;while(bb.length%8!=0)bb.put(0,1);var bytes=bb.buffer;while(bytes.length<cap/8)bytes.push(0);return bytes}
+  function mapData(qr,data){var n=qr.moduleCount,inc=-1,row=n-1,bit=0,byteIndex=0;for(var col=n-1;col>0;col-=2){if(col==6)col--;for(;;){for(var c=0;c<2;c++){var cc=col-c;if(qr.modules[row][cc]===null){var dark=false;if(byteIndex<data.length){dark=((data[byteIndex]>>>(7-bit))&1)==1;bit++;if(bit==8){byteIndex++;bit=0}} qr.modules[row][cc]=dark}}
+      row+=inc;if(row<0||row>=n){row-=inc;inc=-inc;break}}}
+  function drawCanvas(el,qr,size){var n=qr.getModuleCount();var scale=Math.max(3,Math.floor((size||256)/n));var c=document.createElement('canvas');c.width=n*scale;c.height=n*scale;var ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#000';for(var r=0;r<n;r++)for(var col=0;col<n;col++)if(qr.isDark(r,col))ctx.fillRect(col*scale,r*scale,scale,scale);el.innerHTML='';el.appendChild(c)}
+  window.__qrRender=function(el,text,size){try{var qr=new QRCodeModel(0,QRErrorCorrectLevel.M);qr.addData(text);qr.make();drawCanvas(el,qr,size);return true}catch(e){el.innerHTML='<small style="color:#ff8080">QR error: '+e.message+'</small>';return false}}
+})();
 </script>
-<!-- SheetJS --> (XLSX) -->
-  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script>
+(function(){
+  const qrEl = document.getElementById('qr');
+  const linkEl = document.getElementById('link');
+  const diag = document.getElementById('diag');
+  const intervalEl = document.getElementById('interval');
+  const btnTest = document.getElementById('btnTest');
+  const btnStart= document.getElementById('btnStart');
+  const btnStop = document.getElementById('btnStop');
+  let timer=null, seconds=0, ms=10000, lastToken='';
 
-  <script>
-    /***********************
-     * 1) إعداد Firebase   *
-     ***********************/
-    // TODO: استبدل القيم أدناه ببيانات مشروعك من Firebase Console
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      projectId: "YOUR_PROJECT",
-      storageBucket: "YOUR_PROJECT.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+  function log(m){ diag.textContent += (m+'
+'); }
+  function token(len=16){ const a=new Uint8Array(len); crypto.getRandomValues(a); return Array.from(a).map(x=>('0'+x.toString(16)).slice(-2)).join(''); }
+  function makeURL(tok){ const u=new URL(location.href); u.search=''; u.searchParams.set('mode','student'); u.searchParams.set('session','DEBUG-SESSION'); u.searchParams.set('token',tok); return u.toString(); }
+  function render(text){ const ok = window.__qrRender(qrEl,text,256); linkEl.textContent = text; log(ok? '[render] ok':'[render] failed'); }
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const auth = firebase.auth();
+  btnTest.onclick = ()=>{ const demo='https://example.com/?demo='+Date.now(); render(demo); };
+  btnStart.onclick= ()=>{
+    const sec = Math.max(3, parseInt(intervalEl.value||'10',10)); ms = sec*1000; seconds=1; rotate();
+    if(timer) clearInterval(timer); timer=setInterval(()=>{seconds--; if(seconds<=0) rotate();},1000);
+    log('[start] rotation '+sec+'s');
+  };
+  btnStop.onclick = ()=>{ if(timer) clearInterval(timer); timer=null; log('[stop]'); };
 
-    // مراجع المستندات الأساسية
-    const tokenDocRef = db.doc('meta/currentToken');       // يحمل الرمز الحالي + sessionId
-    const attendeesCol = db.collection('attendances');     // سجلات الحضور
-
-    /*****************************************
-     * 2) تهيئة الواجهة (وضع المحاضر/الطالب) *
-     *****************************************/
-    const qs = new URLSearchParams(location.search);
-    const modeFromURL = qs.get('mode');  // 'student' إذا عبر QR
-
-    const secInstructor = document.getElementById('instructor');
-    const secStudent    = document.getElementById('student');
-    const tabInstr = document.getElementById('tabInstructor');
-    const tabStud  = document.getElementById('tabStudent');
-
-    function showInstructor(){ secInstructor.classList.remove('hide'); secStudent.classList.add('hide'); tabInstr.style.background='#0a6ad6'; tabStud.style.background='#1f2d4b'; }
-    function showStudent(){ secStudent.classList.remove('hide'); secInstructor.classList.add('hide'); tabStud.style.background='#0a6ad6'; tabInstr.style.background='#1f2d4b'; }
-
-    tabInstr.onclick = showInstructor;
-    tabStud.onclick  = showStudent;
-
-    if(modeFromURL === 'student'){ showStudent(); } else { showInstructor(); }
-
-    /***********************
-     * 3) مصادقة بسيطة     *
-     ***********************/
-    // الطالب: دخول مجهول تلقائيًا
-    if(modeFromURL === 'student'){
-      auth.signInAnonymously().catch(console.error);
-    }
-
-    // المحاضر: يمكن الاكتفاء بالدخول المجهول أيضًا،
-    // أو تفعيل Email/Password وتقييد الكتابة في القواعد بالحساب المُدرّس.
-
-    /********************************
-     * 4) أدوات عامة / مولد الرموز  *
-     ********************************/
-    const statusEl   = document.getElementById('status');
-    const qrContainer= document.getElementById('qrTarget');
-    const qrBox      = document.getElementById('qr');
-    const qrLinkEl   = document.getElementById('qrLink');
-    const countdownEl= document.getElementById('countdown');
-
-    const courseEl   = document.getElementById('course');
-    const lectureEl  = document.getElementById('lecture');
-    const sessionEl  = document.getElementById('sessionId');
-    const intervalEl = document.getElementById('interval');
-    const btnStart   = document.getElementById('btnStart');
-    const btnStop    = document.getElementById('btnStop');
-    const btnExport  = document.getElementById('btnExport');
-    const btnClear   = document.getElementById('btnClear');
-
-    const tblBody    = document.querySelector('#tbl tbody');
-
-    let qrobj = null;
-    async function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+src));document.head.appendChild(s);});}
-async function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+src));document.head.appendChild(s);});}
-async function ensureQRCodeLib(){ return true; }{
-  if(window.QRCode) return true;
-  try{ await loadScript('https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js'); return true; }
-  catch(e){ try{ await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'); return true; }
-  catch(e2){ return false; } }
-}
-let qrobj=null;
-async function ensureQRCode(){
-  const ok = await ensureQRCodeLib();
-  if(ok && !qrobj){ qrobj = new QRCode(qrContainer,{width:256,height:256}); }
-  return ok;
-}
-function renderQRImageFallback(text){
-  // Google Chart API image fallback (no JS library needed)
-  const imgUrl = 'https://chart.googleapis.com/chart?cht=qr&chs=256x256&chl='+encodeURIComponent(text);
-  qrContainer.innerHTML='';
-  const img=document.createElement('img');
-  img.alt='QR'; img.width=256; img.height=256; img.referrerPolicy='no-referrer';
-  img.src = imgUrl;
-  qrContainer.appendChild(img);
-}}
-
-    function randomToken(len=24){
-      const a = new Uint8Array(len);
-      crypto.getRandomValues(a);
-      return Array.from(a).map(x=>('0'+x.toString(16)).slice(-2)).join('');
-    }
-
-    function nowISO(){ return new Date().toISOString(); }
-
-    // إدارة الجلسة الحالية (محليًا)
-    let current = {
-      sessionId: null,
-      course: '',
-      lecture: '',
-      intervalMs: 10000,
-      timer: null,
-      secondsLeft: 0,
-      lastToken: null
-    };
-
-    function setStatus(msg, kind=''){
-      statusEl.innerHTML = `<span class="${kind}">${msg}</span>`;
-    }
-
-    // ربط حي لقائمة الحضور حسب sessionId
-    let unsubAtt = null;
-    function bindTable(sessionId){
-      if(unsubAtt){ unsubAtt(); unsubAtt=null; }
-      if(!sessionId) { tblBody.innerHTML=''; return; }
-      unsubAtt = attendeesCol.where('sessionId','==',sessionId).orderBy('ts','asc').onSnapshot(snap=>{
-        const rows=[]; let i=1;
-        snap.forEach(doc=>{
-          const d=doc.data();
-          rows.push(`<tr><td>${i++}</td><td>${escapeHtml(d.name||'')}</td><td>${fmtTs(d.ts)}</td><td>${escapeHtml(d.sessionId)}</td><td>${doc.id}</td></tr>`);
-        });
-        tblBody.innerHTML = rows.join('');
-      });
-    }
-
-    function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
-    function fmtTs(ts){ if(!ts) return ''; try{ const d=ts.toDate? ts.toDate(): new Date(ts); return d.toLocaleString('ar-EG'); }catch{ return '' } }
-
-    // تدوير الرمز كل N ثوانٍ: يكتب قيمة جديدة في meta/currentToken => تُبطل السابقة تلقائيًا
-    async function rotateToken(){
-      const token = randomToken(16);
-      current.lastToken = token;
-      const payload = {
-        value: token,
-        sessionId: current.sessionId,
-        course: current.course,
-        lecture: current.lecture,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        active: true
-      };
-      await tokenDocRef.set(payload, {merge:true});
-
-      // توليد رابط الطالب + QR
-      const url = new URL(location.href);
-      url.search = ''; // نزيل أي استعلام سابق
-      url.searchParams.set('mode','student');
-      url.searchParams.set('session', current.sessionId);
-      url.searchParams.set('token', token);
-      ensureQRCode();
-      const libReady = await ensureQRCode();
-      if(libReady){ if(qrobj && qrobj.clear) qrobj.clear(); qrobj.makeCode(url.toString()); }
-      else { renderQRImageFallback(url.toString()); }
-      qrLinkEl.textContent = url.toString();
-
-      // عدّ تنازلي بسيط
-      current.secondsLeft = Math.max(2, Math.floor(current.intervalMs/1000));
-      renderCountdown();
-    }
-
-    function renderCountdown(){
-      countdownEl.textContent = `سيتم توليد رمز جديد بعد ${current.secondsLeft} ثانية…`;
-    }
-
-    function tick(){
-      current.secondsLeft -= 1;
-      if(current.secondsLeft <= 0){ rotateToken().catch(console.error); }
-      else { renderCountdown(); }
-    }
-
-    function startTimer(){
-      if(current.timer) clearInterval(current.timer);
-      current.timer = setInterval(tick, 1000);
-    }
-
-    async function startSession(){
-      current.course = (courseEl.value||'').trim();
-      current.lecture= (lectureEl.value||'').trim();
-      const sec = Math.max(5, parseInt(intervalEl.value||'10',10));
-      current.intervalMs = sec*1000;
-      current.sessionId = `SES-${new Date().toISOString().replace(/[:.TZ-]/g,'').slice(0,14)}`; // YYYYMMDDhhmmss
-      sessionEl.value = current.sessionId;
-      setStatus('تم بدء الجلسة. يتم الآن تدوير رمز QR كل '+sec+' ثانية.', 'ok');
-      bindTable(current.sessionId);
-      await rotateToken();
-      startTimer();
-    }
-
-    async function stopSession(){
-      if(current.timer) { clearInterval(current.timer); current.timer=null; }
-      await tokenDocRef.set({active:false}, {merge:true});
-      setStatus('تم إيقاف الجلسة. لن تُقبل أية أكواد جديدة حتى تبدأ جلسة جديدة.', 'warn');
-      countdownEl.textContent = '';
-    }
-
-    btnStart.onclick = startSession;
-    // ملاحظة: إن لم يظهر QR فتأكد أنك في وضع المحاضر ثم اضغط "بدء الجلسة". لا يظهر QR في وضع الطالب.
-    btnStop.onclick  = stopSession;
-
-    // تصدير XLSX للجلسة الحالية
-    btnExport.onclick = async () => {
-      if(!current.sessionId){ alert('ابدأ جلسة أولًا.'); return; }
-      const snap = await attendeesCol.where('sessionId','==',current.sessionId).orderBy('ts','asc').get();
-      const rows = [['#','الاسم','التاريخ/الوقت','الجلسة','DocID']];
-      let i=1; snap.forEach(doc=>{ const d=doc.data(); rows.push([i++, d.name||'', fmtTs(d.ts), d.sessionId||'', doc.id]); });
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
-      const title = (current.course||'Course') + ' — ' + (current.lecture||'Lecture') + ' — ' + current.sessionId + '.xlsx';
-      XLSX.writeFile(wb, title);
-    };
-
-    // تفريغ الجدول محليًا فقط (لا يحذف من Firestore)
-    btnClear.onclick = ()=>{ tblBody.innerHTML=''; };
-
-    /********************************
-     * 5) وضع الطالب: التحقق + إدخال *
-     ********************************/
-    const nameEl   = document.getElementById('studentName');
-    const btnSub   = document.getElementById('btnSubmit');
-    const btnRec   = document.getElementById('btnMyReceipt');
-    const msgEl    = document.getElementById('studentMsg');
-
-    async function studentSubmit(){
-      const name = (nameEl.value||'').trim();
-      if(name.length < 2){ msgEl.innerHTML = '<span class="bad">رجاءً اكتب اسمك كاملًا بالعربية.</span>'; return; }
-
-      const token = qs.get('token') || '';
-      const sessionId = qs.get('session') || '';
-      if(!token || !sessionId){ msgEl.innerHTML = '<span class="bad">الرابط غير صالح (لا يحتوي على رمز/جلسة).</span>'; return; }
-
-      // نقرأ الرمز الحالي من Firestore لضمان أنه الأحدث
-      const cur = await tokenDocRef.get();
-      if(!cur.exists){ msgEl.innerHTML = '<span class="bad">لم يتم بدء الجلسة بعد.</span>'; return; }
-      const data = cur.data();
-      if(!data.active){ msgEl.innerHTML = '<span class="warn">الجلسة متوقفة حاليًا.</span>'; return; }
-      if(data.sessionId !== sessionId){ msgEl.innerHTML = '<span class="bad">جلسة غير متطابقة. اطلب من المحاضر تحديث الرمز.</span>'; return; }
-      if(data.value !== token){ msgEl.innerHTML = '<span class="bad">هذا الرمز أصبح قديمًا. امسح الرمز الجديد من شاشة القاعة.</span>'; return; }
-
-      // إضافة الحضور
-      const rec = { name, sessionId, token, ts: firebase.firestore.FieldValue.serverTimestamp(), ua: navigator.userAgent };
-      const ref = await attendeesCol.add(rec);
-      msgEl.innerHTML = `<span class="ok">تم تسجيل حضورك بنجاح. معرف السجل: ${ref.id}</span>`;
-      nameEl.value = '';
-    }
-
-    btnSub && (btnSub.onclick = studentSubmit);
-
-    // إيصال بسيط كصورة PNG محلية (لا يُرفع)
-    btnRec && (btnRec.onclick = ()=>{
-      const name = (nameEl.value||'').trim();
-      const sessionId = qs.get('session') || current.sessionId || '';
-      const cnv = document.createElement('canvas');
-      cnv.width = 800; cnv.height = 300; const ctx = cnv.getContext('2d');
-      ctx.fillStyle = '#0b1020'; ctx.fillRect(0,0,cnv.width,cnv.height);
-      ctx.fillStyle = '#19c37d'; ctx.font = '28px \\"Noto Kufi Arabic\\", system-ui';
-      ctx.fillText('إيصال حضور — Attendance Receipt', 20, 50);
-      ctx.fillStyle = '#fff'; ctx.font = '26px \\"Noto Kufi Arabic\\", system-ui';
-      ctx.fillText('الاسم: '+(name||'—'), 20, 120);
-      ctx.fillText('الجلسة: '+(sessionId||'—'), 20, 160);
-      const dt = new Date().toLocaleString('ar-EG');
-      ctx.fillText('الوقت: '+dt, 20, 200);
-      const a = document.createElement('a'); a.download = 'receipt.png'; a.href = cnv.toDataURL(); a.click();
-    });
-
-    // تنشيط تلقائي: لو فتح الطالب بالرابط
-    if(modeFromURL==='student'){
-      const s = qs.get('session'); if(s){ bindTable(s); } // عرض نفس الجلسة إن أردت المتابعة حيًا
-    }
-
-    // الاستماع للتغييرات في الرمز (للمُحاضر فقط)
-    tokenDocRef.onSnapshot(doc=>{
-      const d=doc.data();
-      if(!d) return;
-      if(d.sessionId && d.sessionId!==current.sessionId){ sessionEl.value = d.sessionId; current.sessionId = d.sessionId; bindTable(d.sessionId); }
-    });
-  </script>
-
-  <!--
-  ===============================
-  🔐 اقتراح قواعد أمان Firestore
-  انسخ هذه القواعد (Console ► Firestore Database ► Rules)
-  - تسمح بقراءة الرمز الحالي للجميع.
-  - تتيح كتابة الرمز/جلسة جديدة للمحاضر فقط (بدّل TEACHER_UID).
-  - تتيح للطلاب إنشاء سجل حضور فقط إذا كان token الحالي يطابق meta/currentToken.
-  ===============================
-
-  rules_version = '2';
-  service cloud.firestore {
-    match /databases/{database}/documents {
-      match /meta/currentToken {
-        allow read: if true;  // يستطيع الطالب التحقق من صلاحية الرمز
-        allow write: if request.auth != null && request.auth.uid in ['TEACHER_UID'];
-      }
-
-      match /attendances/{doc} {
-        allow read: if request.auth != null; // أو true إن رغبت
-        allow create: if (
-          // اسم عربي مع مسافات (حد أقصى 80)
-          request.resource.data.name is string && request.resource.data.name.size() > 1 && request.resource.data.name.size() <= 80 &&
-
-          // وجود sessionId و token كسلاسل قصيرة
-          request.resource.data.sessionId is string && request.resource.data.sessionId.size() > 3 &&
-          request.resource.data.token is string && request.resource.data.token.size() > 10 &&
-
-          // مطابقة الرمز الحالي والجلـسة
-          request.resource.data.token == get(/databases/$(database)/documents/meta/currentToken).data.value &&
-          request.resource.data.sessionId == get(/databases/$(database)/documents/meta/currentToken).data.sessionId &&
-
-          // ختم زمني من الخادم
-          request.time >= timestamp.date(2020,1,1)
-        );
-      }
-    }
-  }
-
-  ملاحظة:
-  - لزيادة الانضباط يمكنك تفعيل Anonymous Auth للطلاب (لوضع student) وتفعيل Email/Password لحساب المحاضر ثم وضع UID في القاعدة أعلاه.
-  - كل تدوير للرمز يكتب قيمة جديدة في meta/currentToken، وبذلك يُرفض أي إرسال يستخدم رمزًا قديمًا.
-  - يمكنك تعديل زمن التحديث من واجهة المحاضر.
-  -->
+  function rotate(){ lastToken = token(16); const url=makeURL(lastToken); render(url); seconds = Math.max(2, Math.floor(ms/1000)); }
+})();
+</script>
 </body>
 </html>
