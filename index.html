@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>نظام حضور عبر QR — محدث كل 10 ثوانٍ</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root { --pri:#0a7cff; --bg:#0b1020; --card:#121a2c; --muted:#9fb3c8; --ok:#19c37d; --warn:#ffb020; --bad:#ff5454; }
+    html,body{margin:0;padding:0;background:var(--bg);color:white;font-family:system-ui,Segoe UI,Arial,"Noto Kufi Arabic",sans-serif}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    h1{font-weight:700;margin:0 0 10px;font-size:clamp(20px,4vw,30px)}
+    .sub{color:var(--muted);margin-bottom:18px}
+    .row{display:grid;grid-template-columns:1.3fr 1fr;gap:20px}
+    .card{background:var(--card);border:1px solid #1c2742;border-radius:16px;padding:16px}
+    label{display:block;margin:10px 0 6px;color:#cfe2ff}
+    input,select,button,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #25406b;background:#0c1426;color:white}
+    input::placeholder{color:#6f86a3}
+    button{cursor:pointer;background:linear-gradient(180deg,#0f7bff,#0659c7);border:none}
+    button.secondary{background:#17243e}
+    button.danger{background:linear-gradient(180deg,#ff6767,#d63a3a)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .qrBox{display:grid;place-items:center;min-height:280px;border:1px dashed #2a3b60;border-radius:14px}
+    .muted{color:#9fb3c8;font-size:13px}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;margin-inline-start:6px;background:#0f1a32;border:1px solid #22345a}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #1f2d4b;text-align:right}
+    tr:hover{background:#111a2f}
+    .row2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    .hide{display:none}
+    .ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+    .footer{margin-top:30px;color:#88a0bd;font-size:12px}
+    .flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .left{direction:ltr;text-align:left}
+    .pill{background:#0a6ad6;padding:4px 10px;border-radius:999px;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>تسجيل الحضور بالـ QR (متجدد كل 10 ثوانٍ)</h1>
+    <div class="sub">صفحة واحدة تعمل على GitHub Pages + Firebase. تعرض QR متغيرًا كل 10 ثوانٍ، ويُبطِل الرموز السابقة تلقائيًا. يدخُل الطالب اسمه بالعربية، وتستطيع تصدير الأسماء إلى Excel.</div>
+
+    <!-- Tabs -->
+    <div class="flex" style="margin-bottom:12px">
+      <button id="tabInstructor" class="pill">وضع المُحاضر</button>
+      <button id="tabStudent" class="pill" style="background:#1f2d4b">وضع الطالب</button>
+      <span class="badge">Bioinformatika — Dr. Ahmed M. Sayed Lab</span>
+    </div>
+
+    <!-- Instructor Console -->
+    <section id="instructor" class="card">
+      <div class="row">
+        <div>
+          <div class="grid2">
+            <div>
+              <label>اسم المقرر</label>
+              <input id="course" placeholder="مثال: فيسيولوجيا — الفرقة الثانية" />
+            </div>
+            <div>
+              <label>رقم/عنوان المحاضرة (اختياري)</label>
+              <input id="lecture" placeholder="مثال: Lec 05 — الغدد الكظرية" />
+            </div>
+          </div>
+
+          <div class="grid2" style="margin-top:12px">
+            <div>
+              <label>زمن تحديث الرمز (ثوانٍ)</label>
+              <input id="interval" type="number" min="5" step="5" value="10" />
+            </div>
+            <div>
+              <label>جلسة الحضور</label>
+              <input id="sessionId" placeholder="سيتم توليده تلقائيًا عند البدء" disabled />
+            </div>
+          </div>
+
+          <div class="grid2" style="margin-top:12px">
+            <button id="btnStart">بدء الجلسة + تشغيل QR المتجدد</button>
+            <button id="btnStop" class="danger">إيقاف الجلسة</button>
+          </div>
+
+          <div class="grid2" style="margin-top:12px">
+            <button id="btnExport" class="secondary">تصدير XLSX</button>
+            <button id="btnClear" class="secondary">تفريغ قائمة الجلسة الحالية (محليًا)</button>
+          </div>
+
+          <div id="status" class="muted" style="margin-top:8px"></div>
+          <div class="muted" style="margin-top:6px">تلميح: افتح هذه الصفحة على شاشة العرض في القاعة، ليقوم الطلبة بمسح الـ QR بكاميراتهم.</div>
+        </div>
+        <div>
+          <label>QR الحالي (يبطل ما قبله)</label>
+          <div id="qr" class="qrBox"><div id="qrTarget"></div></div>
+          <div class="muted left" id="qrLink" style="margin-top:8px;word-break:break-all"></div>
+          <div class="muted" id="countdown" style="margin-top:6px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Student Check-in -->
+    <section id="student" class="card hide">
+      <label>اكتب اسمك بالعربية كما سيظهر في كشف الحضور</label>
+      <input id="studentName" placeholder="مثال: أحمد محمد السيد فرج" />
+      <div class="grid2" style="margin-top:12px">
+        <button id="btnSubmit">تسجيل الحضور الآن</button>
+        <button id="btnMyReceipt" class="secondary">تحميل إيصال صغير (PNG)</button>
+      </div>
+      <div class="muted" id="studentMsg" style="margin-top:8px"></div>
+    </section>
+
+    <!-- Live Table -->
+    <section class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">قائمة الحضور (للجلسة الحالية)</h3>
+      <div style="overflow:auto">
+        <table id="tbl">
+          <thead><tr><th>#</th><th>الاسم</th><th>التاريخ/الوقت</th><th>الجلسة</th><th>المعرّف</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="footer">© Bioinformatika — Dr. Ahmed M. Sayed Lab. يعمل دون خادم (Static) مع Firebase Firestore وSheetJS وQRCode.js. 
+      <span class="badge">نصيحة أمنية: فعّل Firebase Auth واكتب القواعد كما بالأسفل.</span>
+    </div>
+  </div>
+
+  <!-- ===== Libraries (CDN) ===== -->
+  <!-- Firebase v10 compat CDN (سهل لملف واحد على GitHub Pages) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+  <!-- QRCode.js -->
+  <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+  <!-- SheetJS (XLSX) -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+  <script>
+    /***********************
+     * 1) إعداد Firebase   *
+     ***********************/
+    // TODO: استبدل القيم أدناه ببيانات مشروعك من Firebase Console
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    // مراجع المستندات الأساسية
+    const tokenDocRef = db.doc('meta/currentToken');       // يحمل الرمز الحالي + sessionId
+    const attendeesCol = db.collection('attendances');     // سجلات الحضور
+
+    /*****************************************
+     * 2) تهيئة الواجهة (وضع المحاضر/الطالب) *
+     *****************************************/
+    const qs = new URLSearchParams(location.search);
+    const modeFromURL = qs.get('mode');  // 'student' إذا عبر QR
+
+    const secInstructor = document.getElementById('instructor');
+    const secStudent    = document.getElementById('student');
+    const tabInstr = document.getElementById('tabInstructor');
+    const tabStud  = document.getElementById('tabStudent');
+
+    function showInstructor(){ secInstructor.classList.remove('hide'); secStudent.classList.add('hide'); tabInstr.style.background='#0a6ad6'; tabStud.style.background='#1f2d4b'; }
+    function showStudent(){ secStudent.classList.remove('hide'); secInstructor.classList.add('hide'); tabStud.style.background='#0a6ad6'; tabInstr.style.background='#1f2d4b'; }
+
+    tabInstr.onclick = showInstructor;
+    tabStud.onclick  = showStudent;
+
+    if(modeFromURL === 'student'){ showStudent(); } else { showInstructor(); }
+
+    /***********************
+     * 3) مصادقة بسيطة     *
+     ***********************/
+    // الطالب: دخول مجهول تلقائيًا
+    if(modeFromURL === 'student'){
+      auth.signInAnonymously().catch(console.error);
+    }
+
+    // المحاضر: يمكن الاكتفاء بالدخول المجهول أيضًا،
+    // أو تفعيل Email/Password وتقييد الكتابة في القواعد بالحساب المُدرّس.
+
+    /********************************
+     * 4) أدوات عامة / مولد الرموز  *
+     ********************************/
+    const statusEl   = document.getElementById('status');
+    const qrContainer= document.getElementById('qrTarget');
+    const qrBox      = document.getElementById('qr');
+    const qrLinkEl   = document.getElementById('qrLink');
+    const countdownEl= document.getElementById('countdown');
+
+    const courseEl   = document.getElementById('course');
+    const lectureEl  = document.getElementById('lecture');
+    const sessionEl  = document.getElementById('sessionId');
+    const intervalEl = document.getElementById('interval');
+    const btnStart   = document.getElementById('btnStart');
+    const btnStop    = document.getElementById('btnStop');
+    const btnExport  = document.getElementById('btnExport');
+    const btnClear   = document.getElementById('btnClear');
+
+    const tblBody    = document.querySelector('#tbl tbody');
+
+    let qrobj = null;
+    function ensureQRCode(){ if(!qrobj){ qrobj = new QRCode(qrContainer, {width:256,height:256}); } }
+
+    function randomToken(len=24){
+      const a = new Uint8Array(len);
+      crypto.getRandomValues(a);
+      return Array.from(a).map(x=>('0'+x.toString(16)).slice(-2)).join('');
+    }
+
+    function nowISO(){ return new Date().toISOString(); }
+
+    // إدارة الجلسة الحالية (محليًا)
+    let current = {
+      sessionId: null,
+      course: '',
+      lecture: '',
+      intervalMs: 10000,
+      timer: null,
+      secondsLeft: 0,
+      lastToken: null
+    };
+
+    function setStatus(msg, kind=''){
+      statusEl.innerHTML = `<span class="${kind}">${msg}</span>`;
+    }
+
+    // ربط حي لقائمة الحضور حسب sessionId
+    let unsubAtt = null;
+    function bindTable(sessionId){
+      if(unsubAtt){ unsubAtt(); unsubAtt=null; }
+      if(!sessionId) { tblBody.innerHTML=''; return; }
+      unsubAtt = attendeesCol.where('sessionId','==',sessionId).orderBy('ts','asc').onSnapshot(snap=>{
+        const rows=[]; let i=1;
+        snap.forEach(doc=>{
+          const d=doc.data();
+          rows.push(`<tr><td>${i++}</td><td>${escapeHtml(d.name||'')}</td><td>${fmtTs(d.ts)}</td><td>${escapeHtml(d.sessionId)}</td><td>${doc.id}</td></tr>`);
+        });
+        tblBody.innerHTML = rows.join('');
+      });
+    }
+
+    function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+    function fmtTs(ts){ if(!ts) return ''; try{ const d=ts.toDate? ts.toDate(): new Date(ts); return d.toLocaleString('ar-EG'); }catch{ return '' } }
+
+    // تدوير الرمز كل N ثوانٍ: يكتب قيمة جديدة في meta/currentToken => تُبطل السابقة تلقائيًا
+    async function rotateToken(){
+      const token = randomToken(16);
+      current.lastToken = token;
+      const payload = {
+        value: token,
+        sessionId: current.sessionId,
+        course: current.course,
+        lecture: current.lecture,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        active: true
+      };
+      await tokenDocRef.set(payload, {merge:true});
+
+      // توليد رابط الطالب + QR
+      const url = new URL(location.href);
+      url.search = ''; // نزيل أي استعلام سابق
+      url.searchParams.set('mode','student');
+      url.searchParams.set('session', current.sessionId);
+      url.searchParams.set('token', token);
+      ensureQRCode();
+      qrobj.makeCode(url.toString());
+      qrLinkEl.textContent = url.toString();
+
+      // عدّ تنازلي بسيط
+      current.secondsLeft = Math.max(2, Math.floor(current.intervalMs/1000));
+      renderCountdown();
+    }
+
+    function renderCountdown(){
+      countdownEl.textContent = `سيتم توليد رمز جديد بعد ${current.secondsLeft} ثانية…`;
+    }
+
+    function tick(){
+      current.secondsLeft -= 1;
+      if(current.secondsLeft <= 0){ rotateToken().catch(console.error); }
+      else { renderCountdown(); }
+    }
+
+    function startTimer(){
+      if(current.timer) clearInterval(current.timer);
+      current.timer = setInterval(tick, 1000);
+    }
+
+    async function startSession(){
+      current.course = (courseEl.value||'').trim();
+      current.lecture= (lectureEl.value||'').trim();
+      const sec = Math.max(5, parseInt(intervalEl.value||'10',10));
+      current.intervalMs = sec*1000;
+      current.sessionId = `SES-${new Date().toISOString().replace(/[:.TZ-]/g,'').slice(0,14)}`; // YYYYMMDDhhmmss
+      sessionEl.value = current.sessionId;
+      setStatus('تم بدء الجلسة. يتم الآن تدوير رمز QR كل '+sec+' ثانية.', 'ok');
+      bindTable(current.sessionId);
+      await rotateToken();
+      startTimer();
+    }
+
+    async function stopSession(){
+      if(current.timer) { clearInterval(current.timer); current.timer=null; }
+      await tokenDocRef.set({active:false}, {merge:true});
+      setStatus('تم إيقاف الجلسة. لن تُقبل أية أكواد جديدة حتى تبدأ جلسة جديدة.', 'warn');
+      countdownEl.textContent = '';
+    }
+
+    btnStart.onclick = startSession;
+    btnStop.onclick  = stopSession;
+
+    // تصدير XLSX للجلسة الحالية
+    btnExport.onclick = async () => {
+      if(!current.sessionId){ alert('ابدأ جلسة أولًا.'); return; }
+      const snap = await attendeesCol.where('sessionId','==',current.sessionId).orderBy('ts','asc').get();
+      const rows = [['#','الاسم','التاريخ/الوقت','الجلسة','DocID']];
+      let i=1; snap.forEach(doc=>{ const d=doc.data(); rows.push([i++, d.name||'', fmtTs(d.ts), d.sessionId||'', doc.id]); });
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+      const title = (current.course||'Course') + ' — ' + (current.lecture||'Lecture') + ' — ' + current.sessionId + '.xlsx';
+      XLSX.writeFile(wb, title);
+    };
+
+    // تفريغ الجدول محليًا فقط (لا يحذف من Firestore)
+    btnClear.onclick = ()=>{ tblBody.innerHTML=''; };
+
+    /********************************
+     * 5) وضع الطالب: التحقق + إدخال *
+     ********************************/
+    const nameEl   = document.getElementById('studentName');
+    const btnSub   = document.getElementById('btnSubmit');
+    const btnRec   = document.getElementById('btnMyReceipt');
+    const msgEl    = document.getElementById('studentMsg');
+
+    async function studentSubmit(){
+      const name = (nameEl.value||'').trim();
+      if(name.length < 2){ msgEl.innerHTML = '<span class="bad">رجاءً اكتب اسمك كاملًا بالعربية.</span>'; return; }
+
+      const token = qs.get('token') || '';
+      const sessionId = qs.get('session') || '';
+      if(!token || !sessionId){ msgEl.innerHTML = '<span class="bad">الرابط غير صالح (لا يحتوي على رمز/جلسة).</span>'; return; }
+
+      // نقرأ الرمز الحالي من Firestore لضمان أنه الأحدث
+      const cur = await tokenDocRef.get();
+      if(!cur.exists){ msgEl.innerHTML = '<span class="bad">لم يتم بدء الجلسة بعد.</span>'; return; }
+      const data = cur.data();
+      if(!data.active){ msgEl.innerHTML = '<span class="warn">الجلسة متوقفة حاليًا.</span>'; return; }
+      if(data.sessionId !== sessionId){ msgEl.innerHTML = '<span class="bad">جلسة غير متطابقة. اطلب من المحاضر تحديث الرمز.</span>'; return; }
+      if(data.value !== token){ msgEl.innerHTML = '<span class="bad">هذا الرمز أصبح قديمًا. امسح الرمز الجديد من شاشة القاعة.</span>'; return; }
+
+      // إضافة الحضور
+      const rec = { name, sessionId, token, ts: firebase.firestore.FieldValue.serverTimestamp(), ua: navigator.userAgent };
+      const ref = await attendeesCol.add(rec);
+      msgEl.innerHTML = `<span class="ok">تم تسجيل حضورك بنجاح. معرف السجل: ${ref.id}</span>`;
+      nameEl.value = '';
+    }
+
+    btnSub && (btnSub.onclick = studentSubmit);
+
+    // إيصال بسيط كصورة PNG محلية (لا يُرفع)
+    btnRec && (btnRec.onclick = ()=>{
+      const name = (nameEl.value||'').trim();
+      const sessionId = qs.get('session') || current.sessionId || '';
+      const cnv = document.createElement('canvas');
+      cnv.width = 800; cnv.height = 300; const ctx = cnv.getContext('2d');
+      ctx.fillStyle = '#0b1020'; ctx.fillRect(0,0,cnv.width,cnv.height);
+      ctx.fillStyle = '#19c37d'; ctx.font = '28px \\"Noto Kufi Arabic\\", system-ui';
+      ctx.fillText('إيصال حضور — Attendance Receipt', 20, 50);
+      ctx.fillStyle = '#fff'; ctx.font = '26px \\"Noto Kufi Arabic\\", system-ui';
+      ctx.fillText('الاسم: '+(name||'—'), 20, 120);
+      ctx.fillText('الجلسة: '+(sessionId||'—'), 20, 160);
+      const dt = new Date().toLocaleString('ar-EG');
+      ctx.fillText('الوقت: '+dt, 20, 200);
+      const a = document.createElement('a'); a.download = 'receipt.png'; a.href = cnv.toDataURL(); a.click();
+    });
+
+    // تنشيط تلقائي: لو فتح الطالب بالرابط
+    if(modeFromURL==='student'){
+      const s = qs.get('session'); if(s){ bindTable(s); } // عرض نفس الجلسة إن أردت المتابعة حيًا
+    }
+
+    // الاستماع للتغييرات في الرمز (للمُحاضر فقط)
+    tokenDocRef.onSnapshot(doc=>{
+      const d=doc.data();
+      if(!d) return;
+      if(d.sessionId && d.sessionId!==current.sessionId){ sessionEl.value = d.sessionId; current.sessionId = d.sessionId; bindTable(d.sessionId); }
+    });
+  </script>
+
+  <!--
+  ===============================
+  🔐 اقتراح قواعد أمان Firestore
+  انسخ هذه القواعد (Console ► Firestore Database ► Rules)
+  - تسمح بقراءة الرمز الحالي للجميع.
+  - تتيح كتابة الرمز/جلسة جديدة للمحاضر فقط (بدّل TEACHER_UID).
+  - تتيح للطلاب إنشاء سجل حضور فقط إذا كان token الحالي يطابق meta/currentToken.
+  ===============================
+
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /meta/currentToken {
+        allow read: if true;  // يستطيع الطالب التحقق من صلاحية الرمز
+        allow write: if request.auth != null && request.auth.uid in ['TEACHER_UID'];
+      }
+
+      match /attendances/{doc} {
+        allow read: if request.auth != null; // أو true إن رغبت
+        allow create: if (
+          // اسم عربي مع مسافات (حد أقصى 80)
+          request.resource.data.name is string && request.resource.data.name.size() > 1 && request.resource.data.name.size() <= 80 &&
+
+          // وجود sessionId و token كسلاسل قصيرة
+          request.resource.data.sessionId is string && request.resource.data.sessionId.size() > 3 &&
+          request.resource.data.token is string && request.resource.data.token.size() > 10 &&
+
+          // مطابقة الرمز الحالي والجلـسة
+          request.resource.data.token == get(/databases/$(database)/documents/meta/currentToken).data.value &&
+          request.resource.data.sessionId == get(/databases/$(database)/documents/meta/currentToken).data.sessionId &&
+
+          // ختم زمني من الخادم
+          request.time >= timestamp.date(2020,1,1)
+        );
+      }
+    }
+  }
+
+  ملاحظة:
+  - لزيادة الانضباط يمكنك تفعيل Anonymous Auth للطلاب (لوضع student) وتفعيل Email/Password لحساب المحاضر ثم وضع UID في القاعدة أعلاه.
+  - كل تدوير للرمز يكتب قيمة جديدة في meta/currentToken، وبذلك يُرفض أي إرسال يستخدم رمزًا قديمًا.
+  - يمكنك تعديل زمن التحديث من واجهة المحاضر.
+  -->
+</body>
+</html>
